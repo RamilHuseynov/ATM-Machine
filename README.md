@@ -16,8 +16,8 @@ Bu layihəni local serverdə qurmaq üçün aşağıdakı addımları izləyin:
 ### 1. Git Repository-ni Klonlayın
 
 ```bash
-git clone https://github.com/RamilHuseynov/ATM.git
-cd ATM
+git clone https://github.com/RamilHuseynov/ATM-Machine.git
+cd ATM-Machine
 ```
 
 ### 2. Composer-i Yükləyin
@@ -68,16 +68,20 @@ API-nin əsas endpointləri aşağıda göstərilmişdir.
 - **Body**:
   ```json
   {
+    "account_number": "12345",
     "balance": 1000
   }
   ```
 - **Response**:
   ```json
   {
-    "id": 1,
-    "balance": 1000,
-    "created_at": "2025-02-12T12:00:00",
-    "updated_at": "2025-02-12T12:00:00"
+    "message": "Hesab yaradıldı!",
+    "account": {
+        "account_number": "12345",
+        "balance": 1000,
+        "updated_at": "2025-03-01T18:55:07.000000Z",
+        "created_at": "2025-03-01T18:55:07.000000Z",
+        "id": 1
   }
   ```
 
@@ -114,15 +118,19 @@ API-nin əsas endpointləri aşağıda göstərilmişdir.
 - **Endpoint**: `GET /api/accounts/{account}/history`
 - **Response**:
   ```json
-  [
-    {
-      "id": 1,
-      "account_id": 1,
-      "amount": 125,
-      "operation_type": "withdrawal",
-      "created_at": "2025-02-12T12:00:00"
-    }
-  ]
+  {
+     "transactions": [
+        {
+            "id": 1,
+            "account_id": 1,
+            "amount": "125.00",
+            "type": "withdraw",
+            "deleted_at": null,
+            "created_at": "2025-03-01T18:27:26.000000Z",
+            "updated_at": "2025-03-01T18:27:26.000000Z"
+        }
+    ]
+  }
   ```
 
 ### 4. **Əməliyyat Silinməsi (Xüsusi İstifadəçilər üçün)**
