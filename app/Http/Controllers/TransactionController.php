@@ -22,22 +22,83 @@ class TransactionController extends Controller
 
         DB::beginTransaction();
         try {
-            $bills = Bill::orderBy('denomination', 'desc')->get();
+            $bills = Bill::where('quantity', '>', 0)->orderBy('denomination', 'desc')->get();
             $withdrawalBills = [];
             $remainingAmount = $amount;
 
+            $possibleCombinations = [];
+
+            // 1. Ən böyük əskinaslardan istifadə edərək məbləği çıxarmağa çalışırıq
             foreach ($bills as $bill) {
                 if ($remainingAmount >= $bill->denomination && $bill->quantity > 0) {
                     $count = min(intdiv($remainingAmount, $bill->denomination), $bill->quantity);
                     $withdrawalBills[$bill->denomination] = $count;
                     $remainingAmount -= $count * $bill->denomination;
-                    $bill->decrement('quantity', $count);
+                }
+            }
+
+            // 2. Əgər məbləğ tam çıxarılmadısa, alternativ kombinasiyaları yoxlayırıq
+            if ($remainingAmount > 0) {
+                $bestAlternative = null;
+                $minRemaining = PHP_INT_MAX;
+
+                foreach ($bills as $bill1) {
+                    foreach ($bills as $bill2) {
+                        if ($bill1->id !== $bill2->id) {
+                            $altRemaining = $amount;
+                            $altCombination = [];
+
+                            $count1 = min(intdiv($altRemaining, $bill1->denomination), $bill1->quantity);
+                            $altCombination[$bill1->denomination] = $count1;
+                            $altRemaining -= $count1 * $bill1->denomination;
+
+                            $count2 = min(intdiv($altRemaining, $bill2->denomination), $bill2->quantity);
+                            $altCombination[$bill2->denomination] = $count2;
+                            $altRemaining -= $count2 * $bill2->denomination;
+
+                            if ($altRemaining == 0 && $altRemaining < $minRemaining) {
+                                $bestAlternative = $altCombination;
+                                $minRemaining = $altRemaining;
+                            }
+                        }
+                    }
+                }
+
+                if ($bestAlternative) {
+                    $withdrawalBills = $bestAlternative;
+                    $remainingAmount = 0;
                 }
             }
 
             if ($remainingAmount > 0) {
                 DB::rollBack();
-                return response()->json(['message' => 'Not enough bills to dispense'], 400);
+
+                // 3. ATM-nin maksimum nə qədər pul verə biləcəyini müəyyən edirik
+                $maxWithdrawableAmount = 0;
+                $availableBills = [];
+                $tempRemaining = $amount;
+
+                foreach ($bills as $bill) {
+                    if ($bill->quantity > 0) {
+                        $count = min(intdiv($tempRemaining, $bill->denomination), $bill->quantity);
+                        if ($count > 0) {
+                            $availableBills[$bill->denomination] = $count;
+                            $maxWithdrawableAmount += $count * $bill->denomination;
+                            $tempRemaining -= $count * $bill->denomination;
+                        }
+                    }
+                }
+
+                return response()->json([
+                    'message' => 'Not enough bills to dispense',
+                    'max_withdrawable' => $maxWithdrawableAmount,
+                    'available_bills' => $availableBills,
+                ], 400);
+            }
+
+            // 4. Əgər ATM məbləği verə bilirsə, əskinasları yenilə
+            foreach ($withdrawalBills as $denomination => $count) {
+                Bill::where('denomination', $denomination)->decrement('quantity', $count);
             }
 
             $account->decrement('balance', $amount);
